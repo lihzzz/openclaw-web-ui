@@ -1,30 +1,43 @@
 # OpenClaw Web UI
 
-一个现代化的 OpenClaw 管理界面，用于监控和管理 AI Agent 系统。
+支付体验 Agent 的 Web 管理界面，提供聊天、会话管理、模型配置、统计数据等功能。
 
 ## 功能特性
 
-- **Agent 管理** - 查看和管理所有 Agent，实时监控状态
-- **会话管理** - 查看和管理对话会话
-- **模型统计** - Token 使用量统计，按模型、按时间分析
-- **配置管理** - 热重载配置，无需重启服务
-- **技能管理** - 创建、编辑和管理 Agent 技能
-- **实时聊天** - WebSocket 实时通信，支持流式响应
+- **聊天界面** - 与 Agent 实时对话，支持 Markdown 渲染和工具调用展示
+- **Agent 管理** - 查看和管理所有 Agent 的状态和配置
+- **会话管理** - 查看和管理用户会话，支持会话测试
+- **模型配置** - 管理模型提供商和模型配置
+- **统计数据** - 查看使用统计、Token 消耗、响应时间等
+- **技能管理** - 浏览和管理 Agent 技能文件
+- **配置热重载** - 支持配置文件的实时热重载
 
 ## 技术栈
 
 - **前端**: Vue 3 + TypeScript + Vite
-- **后端**: Express.js + TypeScript
-- **样式**: 原生 CSS（暗色主题）
-- **通信**: WebSocket 实时通信 + REST API
+- **状态管理**: Pinia
+- **样式**: SCSS
+- **后端**: Express.js
+- **通信**: WebSocket (与 Agent Gateway 通信)
+
+## 项目结构
+
+```
+gui-web/
+├── src/                    # 前端源码
+│   ├── components/         # Vue 组件
+│   ├── views/              # 页面视图
+│   ├── stores/             # Pinia 状态管理
+│   ├── services/           # API 服务
+│   ├── router/             # 路由配置
+│   └── utils/              # 工具函数
+├── server/                 # 后端 API 服务
+│   ├── api/                # API 路由
+│   └── lib/                # 后端工具库
+└── public/                 # 静态资源
+```
 
 ## 快速开始
-
-### 前置要求
-
-- Node.js 18+
-- npm 或 pnpm
-- OpenClaw 已安装并运行
 
 ### 安装依赖
 
@@ -34,20 +47,22 @@ npm install
 
 ### 开发模式
 
-同时启动前端和后端：
+启动前端开发服务器：
+
+```bash
+npm run dev
+```
+
+启动后端 API 服务器：
+
+```bash
+npm run dev:server
+```
+
+同时启动前后端：
 
 ```bash
 npm run dev:all
-```
-
-或分别启动：
-
-```bash
-# 终端 1 - 后端 API 服务器 (端口 3001)
-npm run dev:server
-
-# 终端 2 - 前端开发服务器 (端口 3000)
-npm run dev
 ```
 
 ### 生产构建
@@ -56,73 +71,36 @@ npm run dev
 npm run build
 ```
 
-## 项目结构
-
-```
-├── src/
-│   ├── components/     # Vue 组件
-│   ├── views/          # 页面视图
-│   ├── stores/         # Pinia 状态管理
-│   ├── services/       # API 服务
-│   ├── types/          # TypeScript 类型定义
-│   └── assets/         # 静态资源
-├── server/
-│   ├── api/            # API 路由
-│   ├── lib/            # 服务端工具库
-│   └── index.ts        # 服务器入口
-└── public/             # 公共静态文件
-```
-
 ## 配置
 
-### 环境变量
+### 前端配置
 
-- `API_PORT` - 后端 API 端口（默认 3001）
-- `OPENCLAW_HOME` - OpenClaw 配置目录（默认 `~/.openclaw`）
+前端默认连接到 `http://localhost:3000` 的 Agent Gateway。可在设置界面中修改：
 
-### OpenClaw 配置
+- Gateway 地址
+- 认证 Token
+- 连接超时时间
 
-确保 OpenClaw Gateway 正在运行，默认端口为 443。
+### 后端配置
 
-## 页面说明
-
-| 路由 | 说明 |
-|------|------|
-| `/` | 聊天界面 |
-| `/agents` | Agent 管理和状态监控 |
-| `/sessions` | 会话列表和管理 |
-| `/models` | 模型使用统计 |
-| `/stats` | 统计数据可视化 |
-| `/config` | 配置管理和热重载 |
-| `/skills` | 技能管理 |
+后端 API 服务器默认运行在 `3001` 端口，可通过环境变量 `API_PORT` 修改。
 
 ## API 端点
 
-| 端点 | 说明 |
+| 端点 | 描述 |
 |------|------|
-| `GET /api/config` | 获取配置 |
-| `GET /api/stats-all` | 获取所有统计数据 |
-| `GET /api/agent-status` | 获取 Agent 状态 |
-| `POST /api/test-agents` | 测试所有 Agent |
-| `GET /api/sessions` | 获取会话列表 |
-| `GET /api/skills` | 获取技能列表 |
+| `/api/config` | 获取 Agent 配置 |
+| `/api/stats` | 获取统计数据 |
+| `/api/sessions` | 会话管理 |
+| `/api/agent-status` | Agent 状态 |
+| `/api/skills` | 技能管理 |
+| `/api/test-*` | 各类测试接口 |
 
-## 开发
+## 环境要求
 
-### 类型检查
+- Node.js >= 18
+- npm >= 9
 
-```bash
-npm run build
-```
-
-### 代码风格
-
-项目使用 TypeScript，请确保类型正确。
-
-## 许可证
+## License
 
 MIT
-
-## 相关项目
-
-- [OpenClaw](https://github.com/your-org/openclaw) - AI Agent 框架
