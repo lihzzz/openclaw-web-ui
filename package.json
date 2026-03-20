@@ -1,0 +1,37 @@
+{
+  "name": "gui-web",
+  "version": "1.0.0",
+  "description": "支付体验 Agent Web 聊天界面",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:all": "npm run dev:server & npm run dev",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "server": "tsx server/index.ts"
+  },
+  "dependencies": {
+    "@tanstack/vue-query": "^5.92.9",
+    "@vueuse/core": "^14.2.1",
+    "axios": "^1.13.6",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "markdown-it": "^14.1.1",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.25",
+    "vue-router": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/markdown-it": "^14.1.1",
+    "@types/node": "^25.5.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "sass": "^1.97.3",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vue-tsc": "^3.0.0"
+  }
+}

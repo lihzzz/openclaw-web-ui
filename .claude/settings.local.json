@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "WebSearch",
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 5 npm run server:*)",
+      "Bash(pkill:*)",
+      "Bash(npx tsc)",
+      "Bash(ls:*)",
+      "Bash(xargs:*)",
+      "Bash(head:*)",
+      "Bash(npx tsx:*)",
+      "Bash(python3 -c:*)",
+      "Bash(python3:*)",
+      "Bash(python3 -m json.tool:*)",
+      "Bash(find ~/.openclaw -type f -name gateway*.ts -o -name gateway*.js)",
+      "Bash(npm run type-check)",
+      "Bash(npm run:*)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
