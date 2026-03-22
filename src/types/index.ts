@@ -394,3 +394,4 @@ export interface SkillContentResponse {
   skill: SkillInfo
   content: string
 }
+

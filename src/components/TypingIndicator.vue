@@ -59,14 +59,13 @@ function formatDuration(seconds: number): string {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, var(--gold-dim) 0%, rgba(13, 13, 13, 0.9) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(212, 175, 55, 0.25);
+  padding: 0.625rem 1.125rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 /* 气泡容器 */
@@ -82,14 +81,10 @@ function formatDuration(seconds: number): string {
 .bubble {
   width: 6px;
   height: 6px;
-  background: radial-gradient(circle at 30% 30%, var(--gold-light) 0%, var(--gold-primary) 50%, var(--gold-dark) 100%);
+  background: radial-gradient(circle at 30% 30%, var(--accent-light) 0%, var(--accent) 50%, var(--accent-dark) 100%);
   border-radius: 50%;
   position: relative;
   animation: bubbleRise 1.8s ease-in-out infinite;
-  box-shadow:
-    0 0 6px var(--gold-glow),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.2),
-    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 /* 气泡高光 */
@@ -152,10 +147,9 @@ function formatDuration(seconds: number): string {
 }
 
 .typing-text {
-  color: var(--gold-primary);
+  color: var(--accent);
   font-size: 0.8125rem;
   font-weight: 500;
-  text-shadow: 0 0 10px var(--gold-glow);
 }
 
 .typing-duration {
@@ -164,6 +158,5 @@ function formatDuration(seconds: number): string {
   font-family: var(--font-mono);
   margin-left: 0.25rem;
   font-weight: 400;
-  text-shadow: none;
 }
 </style>

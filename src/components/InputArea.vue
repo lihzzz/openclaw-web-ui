@@ -122,14 +122,14 @@ defineExpose({ focus })
 
 .input-textarea {
   flex: 1;
-  min-height: 48px;
+  min-height: 52px;
   max-height: 200px;
-  padding: 0.875rem 1.125rem;
+  padding: 0.875rem 1.25rem;
   font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text-primary);
-  background: rgba(5, 5, 5, 0.6);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   resize: none;
   outline: none;
@@ -139,14 +139,15 @@ defineExpose({ focus })
 }
 
 .input-textarea:focus {
-  border-color: var(--gold-primary);
-  box-shadow: var(--glow-gold);
-  background: rgba(212, 175, 55, 0.03);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+  background: var(--bg-elevated);
 }
 
 .input-textarea:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background: var(--bg-secondary);
 }
 
 .input-textarea::placeholder {
@@ -163,11 +164,11 @@ defineExpose({ focus })
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   color: var(--text-secondary);
-  background: rgba(115, 115, 115, 0.15);
-  border: 1px solid rgba(115, 115, 115, 0.25);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -175,9 +176,8 @@ defineExpose({ focus })
 
 .reset-button:hover:not(:disabled) {
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+  background: var(--bg-elevated);
+  border-color: var(--warning);
 }
 
 .reset-button:active:not(:disabled) {
@@ -185,7 +185,7 @@ defineExpose({ focus })
 }
 
 .reset-button:disabled {
-  opacity: 0.3;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -193,55 +193,40 @@ defineExpose({ focus })
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  color: var(--abyss-black);
-  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-dark) 100%);
+  width: 52px;
+  height: 52px;
+  color: var(--bg-primary);
+  background: var(--accent);
   border: none;
   border-radius: var(--radius-lg);
   cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: var(--glow-gold);
   transition: all var(--transition-fast);
+  box-shadow: var(--glow-accent);
 }
 
 .send-button:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: var(--glow-gold-strong);
+  background: var(--accent-light);
+  box-shadow: var(--glow-accent-strong);
+  transform: translateY(-1px);
 }
 
 .send-button:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.95);
 }
 
 .send-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  transform: none;
+  background: var(--bg-elevated);
   box-shadow: none;
 }
 
 .input-hint {
+  display: flex;
+  justify-content: center;
   margin-top: 0.5rem;
-  text-align: right;
-}
-
-.input-hint span {
-  font-size: 0.6875rem;
-  font-family: var(--font-mono);
+  font-size: 0.75rem;
   color: var(--text-muted);
-}
-
-@media (max-width: 640px) {
-  .input-textarea {
-    font-size: 1rem;
-    padding: 0.75rem 1rem;
-  }
-
-  .reset-button,
-  .send-button {
-    width: 44px;
-    height: 44px;
-  }
+  font-family: var(--font-mono);
 }
 </style>

@@ -58,6 +58,9 @@ export const useChatStore = defineStore('chat', () => {
 
   // 是否应该重连
   const shouldReconnect = ref<boolean>(false)
+
+  // 消息保存防抖定时器
+  let saveMessagesTimeoutId: ReturnType<typeof setTimeout> | null = null
   
   // === 计算属性 ===
   
@@ -119,6 +122,11 @@ export const useChatStore = defineStore('chat', () => {
   function handleMessage(event: MessageEvent): void {
     try {
       const data = JSON.parse(event.data)
+
+      // 调试日志：打印所有收到的消息类型
+      if (data.type === 'event' && data.event !== 'health' && data.event !== 'tick') {
+        console.log('[DEBUG] WS Message:', JSON.stringify({ type: data.type, event: data.event, payload: data.payload }, null, 2))
+      }
 
       // 过滤心跳和健康检查消息
       if (data.type === 'event' && (data.event === 'health' || data.event === 'tick')) {
@@ -229,6 +237,8 @@ export const useChatStore = defineStore('chat', () => {
         connectionState.value = 'connected'
         connectionError.value = ''
 
+
+
         // 保存被授予的权限信息
         if ('grantedScopes' in result && Array.isArray(result.grantedScopes)) {
           grantedScopes.value = result.grantedScopes as string[]
@@ -246,6 +256,8 @@ export const useChatStore = defineStore('chat', () => {
     } catch (error) {
       const errorMsg = (error as Error).message
       connectionError.value = '认证失败: ' + errorMsg
+
+
 
       // 如果是 token 无效，不应重连
       if (errorMsg.includes('token') || errorMsg.includes('auth') || errorMsg.includes('unauthorized')) {
@@ -275,19 +287,27 @@ export const useChatStore = defineStore('chat', () => {
     const sessionKey = payload.sessionKey as string
     const data = payload.data as Record<string, unknown> | undefined
 
+    // 调试日志：打印收到的 agent 事件
+    console.log('[DEBUG] Agent Event:', JSON.stringify({ stream, runId, sessionKey, data }, null, 2))
+
     // sessionKey 过滤 - 只接受匹配当前 sessionKey 的消息
     if (sessionKey && deviceStore.sessionKey && sessionKey !== deviceStore.sessionKey) {
+      console.log('[DEBUG] Event filtered by sessionKey:', { eventSessionKey: sessionKey, currentSessionKey: deviceStore.sessionKey })
       return
     }
 
     switch (stream) {
       case 'lifecycle': {
         const state = (data?.state || data?.phase) as string
+        console.log('[DEBUG] Lifecycle state:', state, '| Full data:', JSON.stringify(data, null, 2))
 
         if (state === 'start') {
+          console.log('[DEBUG] Lifecycle START detected, setting isTyping=true')
           isTyping.value = true
           typingStartTime.value = Date.now()
           currentRunId.value = runId
+
+
 
           // 创建消息占位符（如果不存在）
           const existingIndex = messages.value.findIndex(m => m.runId === runId && m.role === 'assistant')
@@ -299,11 +319,24 @@ export const useChatStore = defineStore('chat', () => {
               timestamp: Date.now(),
               runId
             })
+            // 立即保存占位符消息
+            saveMessages()
           }
-        } else if (state === 'done' || state === 'final') {
+        } else if (state === 'done' || state === 'final' || state === 'end') {
+          console.log('[DEBUG] Lifecycle END detected (done/final/end), setting isTyping=false')
           isTyping.value = false
+
+          // 流式结束，立即保存最终消息
+          flushSaveMessages()
         } else if (state === 'error') {
+          console.log('[DEBUG] Lifecycle ERROR detected, setting isTyping=false')
           isTyping.value = false
+
+          // 错误时也立即保存
+          flushSaveMessages()
+        } else {
+          // 未知的 lifecycle 状态
+          console.warn('[DEBUG] Unknown lifecycle state:', state, '| isTyping remains:', isTyping.value)
         }
         break
       }
@@ -317,6 +350,8 @@ export const useChatStore = defineStore('chat', () => {
           const existingIndex = messages.value.findIndex(m => m.runId === runId && m.role === 'assistant')
           if (existingIndex >= 0) {
             messages.value[existingIndex].content = filteredText
+            // 流式更新时使用防抖保存
+            debouncedSaveMessages()
           }
         }
         break
@@ -375,6 +410,7 @@ export const useChatStore = defineStore('chat', () => {
     const toolResult = (data.result || data.toolOutput || data.output) as string
     let toolError = data.error as string | undefined
     const toolMeta = data.meta as string | undefined
+    const duration = data.duration as number | undefined
 
     // Gateway 使用 phase 字段: "start" | "result" | "error"
     // 或者使用 status 字段: "running" | "completed" | "error"
@@ -400,6 +436,8 @@ export const useChatStore = defineStore('chat', () => {
       // 使用 status 字段判断状态
       if (status === 'completed') {
         finalStatus = isError ? 'error' : 'success'
+      } else if (status === 'running') {
+        finalStatus = 'running'
       } else {
         finalStatus = status as 'pending' | 'running' | 'success' | 'error'
       }
@@ -439,6 +477,8 @@ export const useChatStore = defineStore('chat', () => {
           status: finalStatus
         })
       }
+      // 工具调用更新时使用防抖保存
+      debouncedSaveMessages()
     } else {
       const lastAssistantMsg = [...messages.value].reverse().find(m => m.role === 'assistant')
       if (lastAssistantMsg) {
@@ -463,6 +503,8 @@ export const useChatStore = defineStore('chat', () => {
             status: finalStatus
           })
         }
+        // 工具调用更新时使用防抖保存
+        debouncedSaveMessages()
       }
     }
   }
@@ -476,8 +518,12 @@ export const useChatStore = defineStore('chat', () => {
     const message = payload.message as Record<string, unknown> | undefined
     const sessionKey = payload.sessionKey as string
 
+    // 调试日志：打印收到的 chat 事件
+    console.log('[DEBUG] Chat Event:', JSON.stringify({ runId, state, sessionKey, message }, null, 2))
+
     // sessionKey 过滤 - 只接受匹配当前 sessionKey 的消息
     if (sessionKey && deviceStore.sessionKey && sessionKey !== deviceStore.sessionKey) {
+      console.log('[DEBUG] Chat event filtered by sessionKey:', { eventSessionKey: sessionKey, currentSessionKey: deviceStore.sessionKey })
       return
     }
 
@@ -509,6 +555,7 @@ export const useChatStore = defineStore('chat', () => {
 
     if (state === 'final') {
       // 最终消息 - 更新或创建
+      console.log('[DEBUG] Chat state=final detected, setting isTyping=false')
       isTyping.value = false
       currentRunId.value = ''
 
@@ -576,6 +623,30 @@ export const useChatStore = defineStore('chat', () => {
     } catch {
       // 忽略存储错误
     }
+  }
+
+  /**
+   * 防抖保存消息（用于流式更新，减少写入频率）
+   */
+  function debouncedSaveMessages(): void {
+    if (saveMessagesTimeoutId) {
+      clearTimeout(saveMessagesTimeoutId)
+    }
+    saveMessagesTimeoutId = setTimeout(() => {
+      saveMessages()
+      saveMessagesTimeoutId = null
+    }, 500) // 500ms 防抖
+  }
+
+  /**
+   * 立即保存消息（取消防抖）
+   */
+  function flushSaveMessages(): void {
+    if (saveMessagesTimeoutId) {
+      clearTimeout(saveMessagesTimeoutId)
+      saveMessagesTimeoutId = null
+    }
+    saveMessages()
   }
   
   /**
@@ -654,6 +725,8 @@ export const useChatStore = defineStore('chat', () => {
     connectionError.value = ''
     shouldReconnect.value = true
 
+
+
     try {
       ws.value = new WebSocket(wsUrl.value)
 
@@ -686,6 +759,9 @@ export const useChatStore = defineStore('chat', () => {
 
         clearPendingRequests(new Error('连接已关闭'))
 
+        // 连接关闭时立即保存消息
+        flushSaveMessages()
+
         const wasConnected = connectionState.value === 'connected'
         connectionState.value = 'disconnected'
         ws.value = null
@@ -711,6 +787,9 @@ export const useChatStore = defineStore('chat', () => {
     shouldReconnect.value = false
     clearConnectionTimeout()
     clearReconnectTimeout()
+
+    // 断开连接前保存消息
+    flushSaveMessages()
 
     if (ws.value) {
       ws.value.close()
@@ -741,6 +820,7 @@ export const useChatStore = defineStore('chat', () => {
     isTyping.value = true
     typingStartTime.value = Date.now()
     currentRunId.value = generateRequestId()
+    console.log('[DEBUG] sendMessage: setting isTyping=true, runId=', currentRunId.value)
 
     try {
       await sendRequest('chat.send', {
@@ -847,6 +927,7 @@ export const useChatStore = defineStore('chat', () => {
     abort,
     clearMessages,
     resetSession,
-    updateSettings
+    updateSettings,
+    flushSaveMessages
   }
 })

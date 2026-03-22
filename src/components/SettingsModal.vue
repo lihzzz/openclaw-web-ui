@@ -149,14 +149,12 @@ function closeModal(): void {
 
 <style scoped>
 .settings-modal {
-  background: rgba(10, 17, 40, 0.9);
+  background: var(--bg-secondary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-glass);
-  box-shadow:
-    var(--glow-cyan),
-    0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 380px;
   overflow: hidden;
@@ -168,16 +166,15 @@ function closeModal(): void {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-glass);
-  background: rgba(3, 7, 17, 0.4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
 }
 
 .modal-title {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--bio-cyan);
+  color: var(--accent);
   margin: 0;
-  text-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
 }
 
 .close-btn {
@@ -194,8 +191,8 @@ function closeModal(): void {
 }
 
 .close-btn:hover {
-  color: var(--bio-cyan);
-  background: var(--bio-cyan-dim);
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .modal-body {
@@ -216,9 +213,9 @@ function closeModal(): void {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.875rem;
-  background: rgba(3, 7, 17, 0.6);
+  background: var(--bg-tertiary);
   border-radius: var(--radius);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-subtle);
   width: fit-content;
 }
 
@@ -227,19 +224,17 @@ function closeModal(): void {
   height: 8px;
   border-radius: 50%;
   background: var(--error);
-  box-shadow: var(--glow-error);
 }
 
 .status-badge.connected .status-dot {
   background: var(--success);
-  box-shadow: var(--glow-success);
-  animation: pulse-on 2s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--success);
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .status-badge.connecting .status-dot,
 .status-badge.authenticating .status-dot {
   background: var(--warning);
-  box-shadow: var(--glow-cyan);
   animation: pulse 1.5s infinite;
 }
 
@@ -261,7 +256,7 @@ function closeModal(): void {
   font-size: 0.8125rem;
   color: var(--error);
   background: var(--error-dim);
-  border: 1px solid rgba(255, 51, 102, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius);
 }
 
@@ -299,8 +294,8 @@ function closeModal(): void {
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
   color: var(--text-primary);
-  background: rgba(3, 7, 17, 0.6);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   outline: none;
   font-family: var(--font-body);
@@ -308,9 +303,9 @@ function closeModal(): void {
 }
 
 .field-input:focus {
-  border-color: var(--bio-cyan);
-  box-shadow: var(--glow-cyan);
-  background: rgba(0, 245, 255, 0.03);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+  background: var(--bg-elevated);
 }
 
 .field-input::placeholder {
@@ -319,8 +314,8 @@ function closeModal(): void {
 
 .session-key {
   padding: 0.5rem 0.75rem;
-  background: rgba(3, 7, 17, 0.6);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   overflow-x: auto;
 }
@@ -328,7 +323,7 @@ function closeModal(): void {
 .session-key code {
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--bio-cyan);
+  color: var(--accent);
 }
 
 .token-field {

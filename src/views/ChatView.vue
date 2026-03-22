@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import MessageList from '@/components/MessageList.vue'
 import InputArea from '@/components/InputArea.vue'
@@ -60,6 +61,11 @@ function closeSettings(): void {
   inputAreaRef.value?.focus()
 }
 
+// 保存消息（用于页面离开时）
+function saveBeforeLeave(): void {
+  chatStore.flushSaveMessages()
+}
+
 // 监听消息变化，自动滚动（深度监听消息内容）
 watch(
   () => chatStore.messages,
@@ -107,54 +113,75 @@ onMounted(async () => {
   // 聚焦输入框
   inputAreaRef.value?.focus()
 })
+
+// 组件卸载前保存消息
+onBeforeUnmount(() => {
+  saveBeforeLeave()
+})
+
+// 路由离开前保存消息
+onBeforeRouteLeave(() => {
+  saveBeforeLeave()
+})
 </script>
 
 <template>
-  <div class="chat-view">
-    <!-- 消息列表 -->
-    <div ref="messagesContainer" class="messages-container">
-      <div class="messages-inner">
-        <MessageList :messages="chatStore.messages" />
-      </div>
-    </div>
-
-    <!-- 打字指示器 -->
-    <div v-if="chatStore.isTyping" class="typing-indicator">
-      <TypingIndicator :duration="chatStore.typingDuration" />
-      <button class="abort-btn" @click="handleAbort">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="6" y="6" width="12" height="12" rx="2" />
-        </svg>
-        <span>停止</span>
-      </button>
-    </div>
-
-    <!-- 输入区域 -->
-    <div class="input-wrapper">
-      <InputArea
-        ref="inputAreaRef"
-        :disabled="!chatStore.isConnected"
-        @send="handleSend"
-        @reset="handleReset"
-      />
-    </div>
-
-    <!-- 设置弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="chatStore.showSettingsModal"
-          class="modal-overlay"
-          @click.self="closeSettings"
-        >
-          <SettingsModal />
+  <div class="chat-layout">
+    <!-- 主聊天区域 -->
+    <div class="chat-view">
+      <!-- 消息列表 -->
+      <div ref="messagesContainer" class="messages-container">
+        <div class="messages-inner">
+          <MessageList :messages="chatStore.messages" />
         </div>
-      </Transition>
-    </Teleport>
+      </div>
+
+      <!-- 打字指示器 -->
+      <div v-if="chatStore.isTyping" class="typing-indicator">
+        <TypingIndicator :duration="chatStore.typingDuration" />
+        <button class="abort-btn" @click="handleAbort">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+          <span>停止</span>
+        </button>
+      </div>
+
+      <!-- 输入区域 -->
+      <div class="input-wrapper">
+        <InputArea
+          ref="inputAreaRef"
+          :disabled="!chatStore.isConnected"
+          @send="handleSend"
+          @reset="handleReset"
+        />
+      </div>
+
+      <!-- 设置弹窗 -->
+      <Teleport to="body">
+        <Transition name="modal">
+          <div
+            v-if="chatStore.showSettingsModal"
+            class="modal-overlay"
+            @click.self="closeSettings"
+          >
+            <SettingsModal />
+          </div>
+        </Transition>
+      </Teleport>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.chat-layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
 .chat-view {
   display: flex;
   flex-direction: column;
@@ -162,6 +189,7 @@ onMounted(async () => {
   flex: 1;
   overflow: hidden;
   background: transparent;
+  min-width: 0;
 }
 
 .messages-container {
@@ -172,8 +200,9 @@ onMounted(async () => {
 }
 
 .messages-inner {
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .typing-indicator {
@@ -181,11 +210,9 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  padding: 0.5rem 1.5rem;
-  background: rgba(13, 13, 13, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid var(--border-glass);
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -198,38 +225,40 @@ onMounted(async () => {
   font-weight: 500;
   font-family: var(--font-mono);
   color: var(--error);
-  background: rgba(239, 68, 68, 0.15);
+  background: var(--error-dim);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .abort-btn:hover {
-  background: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.2);
   border-color: var(--error);
-  box-shadow: var(--glow-error);
 }
 
 .input-wrapper {
   padding: 1rem 1.5rem;
-  background: rgba(13, 13, 13, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid var(--border-glass);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
+}
+
+.input-wrapper :deep(.input-area) {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 5, 5, 0.9);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .modal-enter-active,
@@ -262,4 +291,6 @@ onMounted(async () => {
     padding: 0.75rem 1rem;
   }
 }
+
+
 </style>

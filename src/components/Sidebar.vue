@@ -84,8 +84,8 @@ const pixelIcons: Record<string, string> = {
   width: 180px;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--ocean-dark) 0%, var(--abyss-black) 100%);
-  border-right: 1px solid var(--border-glass);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-subtle);
   z-index: 30;
 }
 
@@ -94,22 +94,20 @@ const pixelIcons: Record<string, string> = {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-glass);
-  background: linear-gradient(135deg, var(--gold-dim) 0%, transparent 100%);
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(135deg, var(--accent-dim) 0%, transparent 100%);
 }
 
 .logo-emoji {
   font-size: 1.5rem;
   line-height: 1;
-  filter: drop-shadow(0 0 8px var(--gold-glow));
 }
 
 .logo-title {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--gold-primary);
-  text-shadow: 0 0 20px var(--gold-glow);
+  color: var(--accent);
   letter-spacing: 0.02em;
 }
 
@@ -133,55 +131,33 @@ const pixelIcons: Record<string, string> = {
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-normal);
   position: relative;
   overflow: hidden;
 }
 
-/* 悬停时的光晕扩散效果 */
-.nav-item::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, var(--gold-dim) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
+/* 悬停效果 */
 .nav-item:hover {
   color: var(--text-primary);
-  transform: scale(1.02) translateX(2px);
-}
-
-.nav-item:hover::before {
-  opacity: 1;
+  background: var(--bg-hover);
+  transform: translateX(2px);
 }
 
 .nav-item:hover .nav-icon {
-  color: var(--gold-primary);
-  filter: drop-shadow(0 0 6px var(--gold-glow));
-  transform: scale(1.15);
+  color: var(--accent);
+  transform: scale(1.1);
 }
 
 .nav-item.active {
-  color: var(--gold-primary);
-  background: linear-gradient(90deg, var(--gold-dim) 0%, transparent 100%);
-  box-shadow: inset 3px 0 0 var(--gold-primary);
+  color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.nav-item.active::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  background: var(--gold-primary);
-  border-radius: 3px 0 0 3px;
-  box-shadow: var(--glow-gold);
+.nav-item.active .nav-icon {
+  color: var(--accent);
 }
 
 .nav-icon {

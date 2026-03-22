@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Message } from '@/stores/chat'
 import { renderMarkdown } from '@/utils/markdown'
 import ToolCallsPanel from './ToolCallsPanel.vue'
@@ -7,6 +7,9 @@ import ToolCallsPanel from './ToolCallsPanel.vue'
 const props = defineProps<{
   messages: Message[]
 }>()
+
+// 复制状态
+const copiedId = ref<string | null>(null)
 
 // 按时间排序的消息
 const sortedMessages = computed(() => {
@@ -33,6 +36,19 @@ function getRoleName(role: string): string {
       return '系统'
     default:
       return role
+  }
+}
+
+// 复制消息内容
+async function copyMessage(message: Message): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(message.content)
+    copiedId.value = message.id
+    setTimeout(() => {
+      copiedId.value = null
+    }, 2000)
+  } catch (err) {
+    console.error('复制失败:', err)
   }
 }
 </script>
@@ -73,6 +89,22 @@ function getRoleName(role: string): string {
             v-html="renderMarkdown(message.content)"
           />
 
+          <!-- 复制按钮 -->
+          <button
+            class="copy-btn"
+            :class="{ copied: copiedId === message.id }"
+            @click="copyMessage(message)"
+            :title="copiedId === message.id ? '已复制' : '复制'"
+          >
+            <svg v-if="copiedId !== message.id" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </button>
+
           <!-- 工具调用面板 -->
           <ToolCallsPanel
             v-if="message.toolCalls && message.toolCalls.length > 0"
@@ -99,12 +131,12 @@ function getRoleName(role: string): string {
 .message-list {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .message {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.875rem;
   animation: bubbleIn var(--transition-slow);
 }
 
@@ -115,60 +147,58 @@ function getRoleName(role: string): string {
 
 .message-assistant {
   justify-content: flex-start;
+  margin-left: 0;
 }
 
 .message-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--radius);
   flex-shrink: 0;
   transition: all var(--transition-normal);
 }
 
 .avatar-user {
-  color: var(--gold-primary);
-  background: var(--gold-dim);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  box-shadow: var(--glow-gold);
+  color: var(--bg-primary);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: var(--glow-accent);
 }
 
 .message:hover .avatar-user {
-  box-shadow: var(--glow-gold-strong);
+  box-shadow: var(--glow-accent-strong);
   transform: scale(1.05);
 }
 
 .avatar-assistant,
 .avatar-system {
-  color: var(--text-primary);
-  background: linear-gradient(135deg, var(--amber-dim) 0%, var(--gold-dim) 100%);
-  border: 1px solid var(--border-glass);
-  box-shadow: var(--glow-amber);
-}
-
-.message:hover .avatar-assistant,
-.message:hover .avatar-system {
-  box-shadow: var(--glow-gold);
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
 }
 
 .message-body {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 75%;
+  max-width: 100%;
 }
 
 .message-user .message-body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  max-width: 85%;
 }
 
 .message-assistant .message-body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  flex: 1 1 auto;
+  max-width: 90%;
 }
 
 .message-header {
@@ -184,7 +214,7 @@ function getRoleName(role: string): string {
 
 .message-role {
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
@@ -198,6 +228,7 @@ function getRoleName(role: string): string {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  position: relative;
 }
 
 .message-user .message-content-wrapper {
@@ -206,94 +237,97 @@ function getRoleName(role: string): string {
 
 .message-content {
   display: inline-block;
-  padding: 0.875rem 1rem;
-  line-height: 1.6;
+  padding: 1rem 1.25rem;
+  line-height: 1.7;
   word-wrap: break-word;
   max-width: 100%;
   position: relative;
+  user-select: text;
+  -webkit-user-select: text;
+  box-shadow: var(--shadow-sm);
 }
 
-/* 用户消息 - 渐变边框效果 */
+/* 复制按钮 */
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: -2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  z-index: 10;
+}
+
+.message:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.copy-btn.copied {
+  background: var(--success-dim);
+  border-color: var(--success);
+  color: var(--success);
+  opacity: 1;
+}
+
+/* 用户消息的复制按钮位置 */
+.message-user .copy-btn {
+  right: auto;
+  left: -2.5rem;
+}
+
+/* 用户消息 - 强调色背景 */
 .message-user .message-content {
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(13, 13, 13, 0.9) 100%);
+  background: var(--accent);
+  color: var(--bg-primary);
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-  position: relative;
+  border: 1px solid var(--accent);
 }
 
-/* 金色渐变边框 - 用户消息 */
-.message-user .message-content::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-dark) 50%, var(--gold-light) 100%);
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.7;
-  animation: gradientBorder 3s ease infinite;
-  background-size: 200% 200%;
+.message-user .message-content :deep(a) {
+  color: var(--bg-primary);
+  text-decoration: underline;
 }
 
-.message-user .message-content::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  pointer-events: none;
+.message-user .message-content :deep(code) {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--bg-primary);
 }
 
-/* 助手消息 - 渐变边框效果 */
+/* 助手消息 - 次级背景 */
 .message-assistant .message-content {
-  background: linear-gradient(135deg, rgba(26, 26, 26, 0.95) 0%, rgba(13, 13, 13, 0.9) 100%);
+  background: var(--bg-secondary);
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
-  position: relative;
-}
-
-/* 柔和金色渐变边框 - 助手消息 */
-.message-assistant .message-content::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.5) 0%, rgba(245, 158, 11, 0.3) 50%, rgba(212, 175, 55, 0.5) 100%);
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.5;
-  animation: gradientBorder 4s ease infinite;
-  background-size: 200% 200%;
-}
-
-.message-assistant .message-content::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 8px 32px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
+  border: 1px solid var(--border-subtle);
 }
 
 /* 悬停效果 */
-.message:hover .message-content::before {
-  opacity: 1;
+.message:hover .message-content {
+  box-shadow: var(--shadow-md);
 }
 
 /* Markdown 样式 */
 :deep(h1), :deep(h2), :deep(h3) {
   margin: 1em 0 0.5em;
-  color: var(--gold-light);
+  color: var(--accent);
   font-weight: 600;
   line-height: 1.3;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(h1) { font-size: 1.5em; }
@@ -302,32 +336,33 @@ function getRoleName(role: string): string {
 
 :deep(p) {
   margin: 0.5em 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
-:deep(p:first-child) {
-  margin-top: 0;
-}
-
-:deep(p:last-child) {
-  margin-bottom: 0;
-}
+:deep(p:first-child) { margin-top: 0; }
+:deep(p:last-child) { margin-bottom: 0; }
 
 :deep(code) {
   font-family: var(--font-mono);
   padding: 0.15em 0.4em;
   border-radius: var(--radius-sm);
-  background: var(--gold-dim);
-  color: var(--gold-light);
+  background: var(--accent-dim);
+  color: var(--accent-light);
   font-size: 0.875em;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(pre) {
   padding: 1em;
   border-radius: var(--radius);
-  background: rgba(5, 5, 5, 0.9);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   overflow-x: auto;
   margin: 0.75em 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(pre code) {
@@ -337,31 +372,36 @@ function getRoleName(role: string): string {
 }
 
 :deep(a) {
-  color: var(--gold-primary);
+  color: var(--accent);
   text-decoration: none;
 }
 
 :deep(a:hover) {
   text-decoration: underline;
-  text-shadow: var(--glow-gold);
 }
 
 :deep(blockquote) {
   padding: 0.5em 1em;
   margin: 0.5em 0;
-  border-left: 3px solid var(--gold-primary);
-  background: var(--gold-dim);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-dim);
   color: var(--text-secondary);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(ul), :deep(ol) {
   padding-left: 1.5em;
   margin: 0.5em 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(li) {
   margin: 0.25em 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(table) {
@@ -369,18 +409,27 @@ function getRoleName(role: string): string {
   width: 100%;
   margin: 0.5em 0;
   font-size: 0.875em;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(th), :deep(td) {
   padding: 0.5em 0.75em;
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-subtle);
   text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 :deep(th) {
-  background: var(--gold-dim);
+  background: var(--accent-dim);
   font-weight: 500;
-  color: var(--gold-primary);
+  color: var(--accent);
+}
+
+:deep(span) {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* 空状态 */
@@ -390,36 +439,23 @@ function getRoleName(role: string): string {
   align-items: center;
   justify-content: center;
   padding: 4rem 2rem;
-  text-align: center;
+  color: var(--text-muted);
 }
 
 .empty-icon {
-  color: var(--gold-primary);
   margin-bottom: 1rem;
-  filter: drop-shadow(var(--glow-gold));
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .empty-title {
   font-size: 1.125rem;
   font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
 }
 
 .empty-desc {
   font-size: 0.875rem;
   color: var(--text-muted);
-}
-
-@media (max-width: 640px) {
-  .message-avatar {
-    width: 28px;
-    height: 28px;
-  }
-
-  .message-content {
-    padding: 0.75rem;
-  }
 }
 </style>
