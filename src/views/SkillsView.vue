@@ -1122,7 +1122,7 @@ watch(isEditing, (editing) => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1130,11 +1130,12 @@ watch(isEditing, (editing) => {
 }
 
 .modal {
-  background: var(--ocean-dark);
-  border: 1px solid var(--border-glass);
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius);
   width: 90%;
   max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .modal-sm {
@@ -1143,10 +1144,11 @@ watch(isEditing, (editing) => {
 
 .modal-header {
   padding: 1rem;
-  border-bottom: 1px solid var(--border-glass);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .modal-header h3 {
@@ -1163,11 +1165,12 @@ watch(isEditing, (editing) => {
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: color var(--transition-fast);
 }
 
 .modal-close:hover {
@@ -1176,14 +1179,22 @@ watch(isEditing, (editing) => {
 
 .modal-body {
   padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.modal-body p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .modal-footer {
   padding: 1rem;
-  border-top: 1px solid var(--border-glass);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .form-group {
