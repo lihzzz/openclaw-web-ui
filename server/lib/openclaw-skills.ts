@@ -35,6 +35,41 @@ function findOpenClawPkg(): string {
 }
 
 const OPENCLAW_PKG = findOpenClawPkg();
+const SKILL_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
+const FILE_NAME_RE = /^[a-zA-Z0-9._-]{1,128}$/;
+
+function toRealPathOrResolved(targetPath: string): string {
+  try {
+    return fs.realpathSync(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
+function pathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const target = toRealPathOrResolved(targetPath);
+  const root = toRealPathOrResolved(rootPath);
+  return target === root || target.startsWith(root + path.sep);
+}
+
+function getAllowedSkillRoots(): string[] {
+  const roots = [OPENCLAW_SKILLS_DIR];
+  if (OPENCLAW_PKG) {
+    roots.push(path.join(OPENCLAW_PKG, "skills"));
+    roots.push(path.join(OPENCLAW_PKG, "extensions"));
+  }
+  return Array.from(new Set(roots.map((item) => path.resolve(item))));
+}
+
+function assertSkillPathAllowed(targetPath: string): string {
+  const normalized = path.resolve(targetPath);
+  const allowedRoots = getAllowedSkillRoots();
+  const isAllowed = allowedRoots.some((root) => pathWithinRoot(normalized, root));
+  if (!isAllowed) {
+    throw new Error("Path is outside allowed skill directories");
+  }
+  return normalized;
+}
 
 function parseFrontmatter(content: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -221,27 +256,30 @@ export function getOpenclawSkillByLocation(location: string): SkillInfo | null {
 }
 
 export function readSkillFile(filePath: string): { content: string; exists: boolean } {
-  if (!fs.existsSync(filePath)) {
+  const safePath = assertSkillPathAllowed(filePath);
+  if (!fs.existsSync(safePath)) {
     return { content: "", exists: false };
   }
   return {
-    content: fs.readFileSync(filePath, "utf-8"),
+    content: fs.readFileSync(safePath, "utf-8"),
     exists: true
   };
 }
 
 export function writeSkillFile(filePath: string, content: string): { success: boolean; error?: string } {
   try {
+    const safePath = assertSkillPathAllowed(filePath);
     // Ensure directory exists
-    const dir = path.dirname(filePath);
+    const dir = path.dirname(safePath);
+    assertSkillPathAllowed(dir);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
     // Write to temp file first, then rename for atomic operation
-    const tmpPath = `${filePath}.tmp`;
+    const tmpPath = `${safePath}.tmp`;
     fs.writeFileSync(tmpPath, content, "utf-8");
-    fs.renameSync(tmpPath, filePath);
+    fs.renameSync(tmpPath, safePath);
 
     return { success: true };
   } catch (err: any) {
@@ -251,7 +289,12 @@ export function writeSkillFile(filePath: string, content: string): { success: bo
 
 export function createSkill(skillId: string, name: string, description: string, emoji: string): { success: boolean; skill?: SkillInfo; error?: string } {
   try {
+    if (!SKILL_ID_RE.test(skillId)) {
+      return { success: false, error: "Invalid skillId (letters/numbers/_/- only)" };
+    }
+
     const skillDir = path.join(OPENCLAW_SKILLS_DIR, skillId);
+    assertSkillPathAllowed(skillDir);
     if (fs.existsSync(skillDir)) {
       return { success: false, error: `Skill "${skillId}" already exists` };
     }
@@ -296,7 +339,12 @@ export function deleteSkill(source: string, skillId: string): { success: boolean
   }
 
   try {
+    if (!SKILL_ID_RE.test(skillId)) {
+      return { success: false, error: "Invalid skillId" };
+    }
+
     const skillDir = path.join(OPENCLAW_SKILLS_DIR, skillId);
+    assertSkillPathAllowed(skillDir);
     if (!fs.existsSync(skillDir)) {
       return { success: false, error: `Skill "${skillId}" not found` };
     }
@@ -311,20 +359,27 @@ export function deleteSkill(source: string, skillId: string): { success: boolean
 }
 
 export function listSkillFiles(skillDir: string): SkillFile[] {
-  return getSkillFiles(skillDir);
+  const safeDir = assertSkillPathAllowed(skillDir);
+  return getSkillFiles(safeDir);
 }
 
 export function createSkillFile(skillDir: string, fileName: string, content: string = ""): { success: boolean; path?: string; error?: string } {
   try {
-    const filePath = path.join(skillDir, fileName);
+    if (!FILE_NAME_RE.test(fileName) || fileName.includes("..") || fileName.includes(path.sep)) {
+      return { success: false, error: "Invalid fileName" };
+    }
+
+    const safeSkillDir = assertSkillPathAllowed(skillDir);
+    const filePath = path.join(safeSkillDir, fileName);
+    assertSkillPathAllowed(filePath);
 
     if (fs.existsSync(filePath)) {
       return { success: false, error: `File "${fileName}" already exists` };
     }
 
     // Ensure directory exists
-    if (!fs.existsSync(skillDir)) {
-      fs.mkdirSync(skillDir, { recursive: true });
+    if (!fs.existsSync(safeSkillDir)) {
+      fs.mkdirSync(safeSkillDir, { recursive: true });
     }
 
     fs.writeFileSync(filePath, content, "utf-8");
@@ -337,11 +392,12 @@ export function createSkillFile(skillDir: string, fileName: string, content: str
 
 export function deleteSkillFile(filePath: string): { success: boolean; error?: string } {
   try {
-    if (!fs.existsSync(filePath)) {
+    const safePath = assertSkillPathAllowed(filePath);
+    if (!fs.existsSync(safePath)) {
       return { success: false, error: "File not found" };
     }
 
-    fs.unlinkSync(filePath);
+    fs.unlinkSync(safePath);
 
     return { success: true };
   } catch (err: any) {

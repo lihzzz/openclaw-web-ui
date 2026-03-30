@@ -14,6 +14,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: 'agents', path: '/', icon: 'agents', label: 'Agents' },
+  { name: 'scheduler', path: '/scheduler', icon: 'scheduler', label: 'Scheduler' },
   { name: 'models', path: '/models', icon: 'models', label: 'Models' },
   { name: 'config', path: '/config', icon: 'config', label: 'Config' },
   { name: 'skills', path: '/skills', icon: 'skills', label: 'Skills' },
@@ -39,6 +40,7 @@ function navigateTo(item: NavItem): void {
 // 像素化图标 SVG 路径
 const pixelIcons: Record<string, string> = {
   agents: `M8 2h8v2H8V2zM6 4h12v2H6V4zM4 6h16v4H4V6zM6 10h12v2H6v-2zM2 12h20v2H2v-2zM3 14h4v6H3v-6zM8 14h8v4H8v-4zM17 14h4v6h-4v-6zM7 11h2v1H7v-1zM11 11h2v1h-2v-1z`,
+  scheduler: `M4 2h16v2H4V2zM2 4h20v2H2V4zM2 6h20v14H2V6zM4 8h6v6H4V8zM12 8h8v2h-8V8zM12 11h8v2h-8v-2zM12 14h8v2h-8v-2zM6 10v2h2v-2H6z`,
   models: `M6 2h12v2H6V2zM4 4h16v2H4V4zM2 6h20v12H2V6zM4 8h16v8H4V8zM6 10h4v2H6v-2zM6 13h8v2H6v-2zM12 10h6v2h-6v-2z`,
   config: `M12 2l2 2h4v2h2v4l2 2-2 2v4h-2v2h-4l-2 2-2-2H6v-2H4v-4l-2-2 2-2V6h2V4h4l2-2zM10 8v8h4V8h-4z`,
   skills: `M4 2h16v2H4V2zM2 4h20v2H2V4zM4 6h16v14H4V6zM6 8h12v10H6V8zM8 10h4v2H8v-2zM8 13h8v2H8v-2zM14 10h2v2h-2v-2zM8 16h6v2H8v-2z`,

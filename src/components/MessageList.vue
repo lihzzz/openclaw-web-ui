@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import type { Message } from '@/stores/chat'
 import { renderMarkdown } from '@/utils/markdown'
+import { createStoreLogger } from '@/utils/logger'
 import ToolCallsPanel from './ToolCallsPanel.vue'
+
+const logger = createStoreLogger('MessageList')
 
 const props = defineProps<{
   messages: Message[]
@@ -11,9 +14,53 @@ const props = defineProps<{
 // 复制状态
 const copiedId = ref<string | null>(null)
 
-// 按时间排序的消息
+// Markdown 渲染缓存 - 使用 Map 存储已渲染的内容
+const markdownCache = shallowRef<Map<string, string>>(new Map())
+
+// 获取带缓存的 Markdown 渲染结果
+function getRenderedMarkdown(content: string, messageId: string): string {
+  const cache = markdownCache.value
+  // 使用消息内容 hash 作为缓存 key，避免重复渲染相同内容
+  const cacheKey = `${messageId}:${content.length}:${content.slice(0, 50)}`
+
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey)!
+  }
+
+  const rendered = renderMarkdown(content)
+
+  // 限制缓存大小，避免内存泄漏
+  if (cache.size > 200) {
+    const firstKey = cache.keys().next().value
+    if (firstKey) {
+      cache.delete(firstKey)
+    }
+  }
+
+  cache.set(cacheKey, rendered)
+  return rendered
+}
+
+// 按时间排序的消息 - 只在消息数量变化时重新计算
 const sortedMessages = computed(() => {
-  return [...props.messages].sort((a, b) => a.timestamp - b.timestamp)
+  // 消息数组已经是按时间顺序添加的，如果最后一条消息的时间戳 >= 前一条，则无需排序
+  const msgs = props.messages
+  if (msgs.length < 2) return msgs
+
+  // 检查是否需要排序（检测逆序）
+  let needsSort = false
+  for (let i = 1; i < msgs.length; i++) {
+    if (msgs[i].timestamp < msgs[i - 1].timestamp) {
+      needsSort = true
+      break
+    }
+  }
+
+  if (!needsSort) return msgs
+
+  // 只有在需要时才进行排序
+  logger.debug('Sorting messages due to out-of-order timestamps')
+  return [...msgs].sort((a, b) => a.timestamp - b.timestamp)
 })
 
 // 格式化时间
@@ -48,16 +95,25 @@ async function copyMessage(message: Message): Promise<void> {
       copiedId.value = null
     }, 2000)
   } catch (err) {
-    console.error('复制失败:', err)
+    logger.error('复制失败:', err)
   }
+}
+
+// 格式化思考内容长度
+function formatThinkingLength(thinking: string): string {
+  const len = thinking.length
+  if (len < 1000) return `${len} 字符`
+  if (len < 10000) return `${(len / 1000).toFixed(1)}K 字符`
+  return `${(len / 10000).toFixed(1)}万字符`
 }
 </script>
 
 <template>
   <div class="message-list">
     <div
-      v-for="message in sortedMessages"
+      v-for="(message, index) in sortedMessages"
       :key="message.id"
+      v-memo="[message.content, message.thinking, message.toolCalls?.length, copiedId === message.id]"
       class="message"
       :class="`message-${message.role}`"
     >
@@ -84,9 +140,21 @@ async function copyMessage(message: Message): Promise<void> {
         </div>
 
         <div class="message-content-wrapper">
+          <!-- 思考内容折叠区域 -->
+          <details v-if="message.thinking" class="thinking-block">
+            <summary class="thinking-summary">
+              <span class="thinking-icon">💭</span>
+              <span class="thinking-label">思考过程</span>
+              <span class="thinking-length">({{ formatThinkingLength(message.thinking) }})</span>
+            </summary>
+            <div class="thinking-content">
+              {{ message.thinking }}
+            </div>
+          </details>
+
           <div
             class="message-content"
-            v-html="renderMarkdown(message.content)"
+            v-html="getRenderedMarkdown(message.content, message.id)"
           />
 
           <!-- 复制按钮 -->
@@ -288,6 +356,76 @@ async function copyMessage(message: Message): Promise<void> {
 .message-user .copy-btn {
   right: auto;
   left: -2.5rem;
+}
+
+/* 思考内容折叠样式 */
+.thinking-block {
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.thinking-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: rgba(138, 180, 248, 0.08);
+  border: 1px solid rgba(138, 180, 248, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  list-style: none;
+}
+
+.thinking-summary::-webkit-details-marker {
+  display: none;
+}
+
+.thinking-summary::before {
+  content: '▸';
+  font-size: 0.625rem;
+  color: rgba(138, 180, 248, 0.6);
+  transition: transform var(--transition-fast);
+}
+
+.thinking-block[open] .thinking-summary::before {
+  transform: rotate(90deg);
+}
+
+.thinking-summary:hover {
+  background: rgba(138, 180, 248, 0.12);
+  border-color: rgba(138, 180, 248, 0.3);
+}
+
+.thinking-icon {
+  font-size: 0.875rem;
+}
+
+.thinking-label {
+  color: rgba(138, 180, 248, 0.9);
+  font-style: italic;
+}
+
+.thinking-length {
+  color: rgba(138, 180, 248, 0.5);
+  font-size: 0.75rem;
+}
+
+.thinking-content {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 2px solid rgba(138, 180, 248, 0.3);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
 }
 
 /* 用户消息 - 强调色背景 */

@@ -12,6 +12,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    allowedHosts: ['y67c7729.natappfree.cc'],
     proxy: {
       '/api': {
         target: `http://127.0.0.1:${process.env.API_PORT || 3001}`,

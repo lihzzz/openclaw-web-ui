@@ -48,7 +48,7 @@ export const useAgentStore = defineStore('agent', () => {
   const agents = computed(() => config.value?.agents || [])
   const providers = computed(() => config.value?.providers || [])
   const defaults = computed(() => config.value?.defaults || { model: '', fallbacks: [] })
-  const gateway = computed(() => config.value?.gateway || { port: 18789, token: '', host: '' })
+  const gateway = computed(() => config.value?.gateway || { port: 18789, host: '', hasToken: false })
 
   // 获取 Agent 状态
   function getAgentState(agentId: string): string {
@@ -74,7 +74,7 @@ export const useAgentStore = defineStore('agent', () => {
         error.value = null
       }
 
-      if (!statsData) {
+      if (statsData) {
         stats.value = statsData
       }
 

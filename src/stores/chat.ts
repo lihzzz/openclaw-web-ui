@@ -1,40 +1,63 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDeviceStore } from './deviceStore'
-import type { Message, ToolCall, Settings, ConnectionState } from '@/types'
+import { createStoreLogger } from '@/utils/logger'
+import { namespacedStorage, STORAGE_KEYS } from '@/utils/storage'
+import type { Message, ToolCall, Settings, ConnectionState, GatewayConfig } from '@/types'
 import { WEBSOCKET_CLOSE_REASONS } from '@/types'
 
 export type { Message, ToolCall, Settings, ConnectionState }
+
+// 创建 Store 专用日志记录器
+const logger = createStoreLogger('chat')
+
+/**
+ * 判断是否为本地地址
+ */
+function isLocalHost(hostname: string): boolean {
+  return hostname === 'localhost' ||
+         hostname === '127.0.0.1' ||
+         hostname === '[::1]' ||
+         hostname.startsWith('192.168.') ||
+         hostname.startsWith('10.') ||
+         hostname.startsWith('172.')
+}
 
 /**
  * 聊天状态管理 Store
  */
 export const useChatStore = defineStore('chat', () => {
   const deviceStore = useDeviceStore()
-  
+
   // === 状态 ===
-  
+
   // 连接状态
   const connectionState = ref<ConnectionState>('disconnected')
   const connectionError = ref<string>('')
-  
+
   // WebSocket 实例
   const ws = ref<WebSocket | null>(null)
-  
+
   // 消息列表
   const messages = ref<Message[]>([])
-  
+
   // 打字状态
   const isTyping = ref<boolean>(false)
   const typingStartTime = ref<number>(0)
-  
+
   // 当前运行 ID
   const currentRunId = ref<string>('')
-  
+
+  // Gateway 配置（从 API 获取）
+  const gatewayConfig = ref<GatewayConfig | null>(null)
+
+  // Gateway 是否需要 Token
+  const gatewayRequiresToken = computed(() => gatewayConfig.value?.hasToken ?? true)
+
   // 设置
   const settings = ref<Settings>({
-    host: import.meta.env.VITE_GATEWAY_HOST || '127.0.0.1',
-    port: parseInt(import.meta.env.VITE_GATEWAY_PORT) || 18789,
+    host: '127.0.0.1',
+    port: 18789,
     token: import.meta.env.VITE_AUTH_TOKEN || '',
     dangerouslyDisableDeviceAuth: import.meta.env.VITE_DISABLE_DEVICE_AUTH === 'true',
     reconnectInterval: 3000,
@@ -65,10 +88,33 @@ export const useChatStore = defineStore('chat', () => {
   // === 计算属性 ===
   
   const isConnected = computed(() => connectionState.value === 'connected')
-  
+
   const wsUrl = computed(() => {
-    const { host, port } = settings.value
+    const currentHost = window.location.hostname
+    const isLocal = isLocalHost(currentHost)
+    const { host: settingsHost, port: settingsPort } = settings.value
+
+    // 如果是从本地访问，使用本地 gateway
+    if (isLocal) {
+      return `ws://${settingsHost}:${settingsPort}`
+    }
+
+    // 如果是从公网访问
+    // 优先使用配置的外部地址
+    if (gatewayConfig.value?.externalHost) {
+      return `ws://${gatewayConfig.value.externalHost}`
+    }
+
+    // 使用用户设置的 host 和 port
+    // 如果用户没有设置 host（使用默认值 127.0.0.1），则使用当前页面的 host
+    const host = (settingsHost && settingsHost !== '127.0.0.1') ? settingsHost : currentHost
+    const port = settingsPort || gatewayConfig.value?.port
     return `ws://${host}:${port}`
+  })
+
+  // 计算属性：显示用的 Gateway 地址
+  const displayGatewayUrl = computed(() => {
+    return wsUrl.value
   })
   
   const typingDuration = computed(() => {
@@ -125,7 +171,7 @@ export const useChatStore = defineStore('chat', () => {
 
       // 调试日志：打印所有收到的消息类型
       if (data.type === 'event' && data.event !== 'health' && data.event !== 'tick') {
-        console.log('[DEBUG] WS Message:', JSON.stringify({ type: data.type, event: data.event, payload: data.payload }, null, 2))
+        logger.debug('WS Message:', JSON.stringify({ type: data.type, event: data.event, payload: data.payload }, null, 2))
       }
 
       // 过滤心跳和健康检查消息
@@ -288,21 +334,21 @@ export const useChatStore = defineStore('chat', () => {
     const data = payload.data as Record<string, unknown> | undefined
 
     // 调试日志：打印收到的 agent 事件
-    console.log('[DEBUG] Agent Event:', JSON.stringify({ stream, runId, sessionKey, data }, null, 2))
+    logger.debug('Agent Event:', { stream, runId, sessionKey, data })
 
     // sessionKey 过滤 - 只接受匹配当前 sessionKey 的消息
     if (sessionKey && deviceStore.sessionKey && sessionKey !== deviceStore.sessionKey) {
-      console.log('[DEBUG] Event filtered by sessionKey:', { eventSessionKey: sessionKey, currentSessionKey: deviceStore.sessionKey })
+      logger.debug('Event filtered by sessionKey:', { eventSessionKey: sessionKey, currentSessionKey: deviceStore.sessionKey })
       return
     }
 
     switch (stream) {
       case 'lifecycle': {
         const state = (data?.state || data?.phase) as string
-        console.log('[DEBUG] Lifecycle state:', state, '| Full data:', JSON.stringify(data, null, 2))
+        logger.debug('Lifecycle state:', state, '| Full data:', data)
 
         if (state === 'start') {
-          console.log('[DEBUG] Lifecycle START detected, setting isTyping=true')
+          logger.debug('Lifecycle START detected, setting isTyping=true')
           isTyping.value = true
           typingStartTime.value = Date.now()
           currentRunId.value = runId
@@ -323,20 +369,20 @@ export const useChatStore = defineStore('chat', () => {
             saveMessages()
           }
         } else if (state === 'done' || state === 'final' || state === 'end') {
-          console.log('[DEBUG] Lifecycle END detected (done/final/end), setting isTyping=false')
+          logger.debug('Lifecycle END detected (done/final/end), setting isTyping=false')
           isTyping.value = false
 
           // 流式结束，立即保存最终消息
           flushSaveMessages()
         } else if (state === 'error') {
-          console.log('[DEBUG] Lifecycle ERROR detected, setting isTyping=false')
+          logger.debug('Lifecycle ERROR detected, setting isTyping=false')
           isTyping.value = false
 
           // 错误时也立即保存
           flushSaveMessages()
         } else {
           // 未知的 lifecycle 状态
-          console.warn('[DEBUG] Unknown lifecycle state:', state, '| isTyping remains:', isTyping.value)
+          logger.warn('Unknown lifecycle state:', state, '| isTyping remains:', isTyping.value)
         }
         break
       }
@@ -345,11 +391,14 @@ export const useChatStore = defineStore('chat', () => {
         // AI 回复文本 - 流式更新
         const text = extractTextFromPayload(data)
         if (text) {
-          const filteredText = filterThoughts(text)
+          const { content: filteredText, thinking } = extractThoughts(text)
           // 查找并更新现有消息
           const existingIndex = messages.value.findIndex(m => m.runId === runId && m.role === 'assistant')
           if (existingIndex >= 0) {
             messages.value[existingIndex].content = filteredText
+            if (thinking) {
+              messages.value[existingIndex].thinking = thinking
+            }
             // 流式更新时使用防抖保存
             debouncedSaveMessages()
           }
@@ -386,14 +435,36 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 过滤 thinking 标签
+   * 提取 thinking 标签内容
+   * 返回 { content: 过滤后的内容, thinking: 提取的思考内容 }
    */
-  function filterThoughts(text: string): string {
-    // 移除 <thought>...</thought> 标签
+  function extractThoughts(text: string): { content: string; thinking: string } {
+    const thoughts: string[] = []
+
+    // 提取 <thought>...</thought> 标签内容
+    const thoughtMatches = text.matchAll(/<thought>([\s\S]*?)<\/thought>/g)
+    for (const match of thoughtMatches) {
+      if (match[1]?.trim()) {
+        thoughts.push(match[1].trim())
+      }
+    }
+
+    // 提取 <antthinking>...</antthinking> 标签内容
+    const antThinkingMatches = text.matchAll(/<antthinking>([\s\S]*?)<\/antthinking>/g)
+    for (const match of antThinkingMatches) {
+      if (match[1]?.trim()) {
+        thoughts.push(match[1].trim())
+      }
+    }
+
+    // 移除 thinking 标签，保留其他内容
     let filtered = text.replace(/<thought>[\s\S]*?<\/thought>/g, '')
-    // 移除 <antthinking>...</antthinking> 标签
     filtered = filtered.replace(/<antthinking>[\s\S]*?<\/antthinking>/g, '')
-    return filtered.trim()
+
+    return {
+      content: filtered.trim(),
+      thinking: thoughts.join('\n\n').trim()
+    }
   }
 
   /**
@@ -410,7 +481,6 @@ export const useChatStore = defineStore('chat', () => {
     const toolResult = (data.result || data.toolOutput || data.output) as string
     let toolError = data.error as string | undefined
     const toolMeta = data.meta as string | undefined
-    const duration = data.duration as number | undefined
 
     // Gateway 使用 phase 字段: "start" | "result" | "error"
     // 或者使用 status 字段: "running" | "completed" | "error"
@@ -519,11 +589,11 @@ export const useChatStore = defineStore('chat', () => {
     const sessionKey = payload.sessionKey as string
 
     // 调试日志：打印收到的 chat 事件
-    console.log('[DEBUG] Chat Event:', JSON.stringify({ runId, state, sessionKey, message }, null, 2))
+    logger.debug('Chat Event:', { runId, state, sessionKey, message })
 
     // sessionKey 过滤 - 只接受匹配当前 sessionKey 的消息
     if (sessionKey && deviceStore.sessionKey && sessionKey !== deviceStore.sessionKey) {
-      console.log('[DEBUG] Chat event filtered by sessionKey:', { eventSessionKey: sessionKey, currentSessionKey: deviceStore.sessionKey })
+      logger.debug('Chat event filtered by sessionKey:', { eventSessionKey: sessionKey, currentSessionKey: deviceStore.sessionKey })
       return
     }
 
@@ -547,20 +617,23 @@ export const useChatStore = defineStore('chat', () => {
 
     if (!content) return
 
-    // 过滤 thinking 标签
-    const filteredContent = filterThoughts(content)
+    // 提取 thinking 标签内容
+    const { content: filteredContent, thinking } = extractThoughts(content)
 
     // 查找现有消息
     const existingIndex = messages.value.findIndex(m => m.runId === runId && m.role === role)
 
     if (state === 'final') {
       // 最终消息 - 更新或创建
-      console.log('[DEBUG] Chat state=final detected, setting isTyping=false')
+      logger.debug('Chat state=final detected, setting isTyping=false')
       isTyping.value = false
       currentRunId.value = ''
 
       if (existingIndex >= 0) {
         messages.value[existingIndex].content = filteredContent
+        if (thinking) {
+          messages.value[existingIndex].thinking = thinking
+        }
         saveMessages()
       } else {
         // 如果没有现有消息，创建新消息
@@ -569,13 +642,17 @@ export const useChatStore = defineStore('chat', () => {
           role,
           content: filteredContent,
           timestamp,
-          runId
+          runId,
+          thinking: thinking || undefined
         })
       }
     } else {
       // streaming 或其他状态 - 只更新现有消息，不创建新消息
       if (existingIndex >= 0) {
         messages.value[existingIndex].content = filteredContent
+        if (thinking) {
+          messages.value[existingIndex].thinking = thinking
+        }
       }
     }
   }
@@ -615,11 +692,11 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 保存消息到 localStorage
+   * 保存消息到 localStorage（带命名空间隔离）
    */
   function saveMessages(): void {
     try {
-      localStorage.setItem('gui-web-messages', JSON.stringify(messages.value.slice(-100)))
+      namespacedStorage.setJSON(STORAGE_KEYS.MESSAGES, messages.value.slice(-100))
     } catch {
       // 忽略存储错误
     }
@@ -650,13 +727,12 @@ export const useChatStore = defineStore('chat', () => {
   }
   
   /**
-   * 加载消息从 localStorage
+   * 加载消息从 localStorage（带命名空间隔离）
    */
   function loadMessages(): void {
     try {
-      const saved = localStorage.getItem('gui-web-messages')
-      if (saved) {
-        const loaded = JSON.parse(saved) as Message[]
+      const loaded = namespacedStorage.getJSON<Message[]>(STORAGE_KEYS.MESSAGES)
+      if (loaded) {
         messages.value = loaded.filter(m => m.content && m.content.trim())
       }
     } catch {
@@ -740,18 +816,17 @@ export const useChatStore = defineStore('chat', () => {
 
       ws.value.onopen = () => {
         clearConnectionTimeout()
-
-        if (settings.value.dangerouslyDisableDeviceAuth) {
-          sendConnectRequest()
-        }
+        // 始终主动发送认证请求，不再等待 challenge
+        sendConnectRequest()
       }
 
       ws.value.onmessage = (event) => {
         handleMessage(event)
       }
 
-      ws.value.onerror = () => {
-        connectionError.value = 'WebSocket 连接错误'
+      ws.value.onerror = (error) => {
+        logger.error('WebSocket error:', error)
+        connectionError.value = `无法连接到 Gateway (${wsUrl.value})，请检查：1) Gateway 是否已启动 2) 地址和端口是否正确`
       }
 
       ws.value.onclose = (event) => {
@@ -767,7 +842,9 @@ export const useChatStore = defineStore('chat', () => {
         ws.value = null
 
         if (event.code !== 1000 && event.code !== 1001) {
-          connectionError.value = WEBSOCKET_CLOSE_REASONS[event.code] || `连接关闭: ${event.code} ${event.reason}`
+          const reason = WEBSOCKET_CLOSE_REASONS[event.code] || `连接关闭: ${event.code} ${event.reason}`
+          connectionError.value = reason
+          logger.warn('WebSocket closed:', reason)
         }
 
         if (shouldReconnect.value && (wasConnected || event.code === 1006)) {
@@ -820,7 +897,7 @@ export const useChatStore = defineStore('chat', () => {
     isTyping.value = true
     typingStartTime.value = Date.now()
     currentRunId.value = generateRequestId()
-    console.log('[DEBUG] sendMessage: setting isTyping=true, runId=', currentRunId.value)
+    logger.debug('sendMessage: setting isTyping=true, runId=', currentRunId.value)
 
     try {
       await sendRequest('chat.send', {
@@ -854,11 +931,11 @@ export const useChatStore = defineStore('chat', () => {
   }
   
   /**
-   * 清空消息
+   * 清空消息（带命名空间隔离）
    */
   function clearMessages(): void {
     messages.value = []
-    localStorage.removeItem('gui-web-messages')
+    namespacedStorage.remove(STORAGE_KEYS.MESSAGES)
   }
 
   /**
@@ -882,26 +959,47 @@ export const useChatStore = defineStore('chat', () => {
   }
   
   /**
-   * 更新设置
+   * 更新设置（带命名空间隔离）
    */
   function updateSettings(newSettings: Partial<Settings>): void {
     settings.value = { ...settings.value, ...newSettings }
-    localStorage.setItem('gui-web-settings', JSON.stringify(settings.value))
+    namespacedStorage.setJSON(STORAGE_KEYS.SETTINGS, settings.value)
   }
-  
+
+  /**
+   * 从 API 获取 gateway 配置
+   */
+  async function fetchGatewayConfig(): Promise<void> {
+    try {
+      const response = await fetch('/api/config')
+      const data = await response.json()
+      if (data.gateway) {
+        gatewayConfig.value = data.gateway
+        // 不再覆盖用户设置的端口
+        // 如果用户没有手动设置过端口（使用默认值），可以考虑更新
+        // 但为了保持用户设置优先，这里不自动覆盖
+      }
+    } catch {
+      // 静默失败，使用默认配置
+    }
+  }
+
   function init(): void {
-    const savedSettings = localStorage.getItem('gui-web-settings')
+    const savedSettings = namespacedStorage.getJSON<Settings>(STORAGE_KEYS.SETTINGS)
     if (savedSettings) {
       try {
-        settings.value = { ...settings.value, ...JSON.parse(savedSettings) }
+        settings.value = { ...settings.value, ...savedSettings }
       } catch {
         // 忽略加载错误
       }
     }
 
     loadMessages()
+
+    // 异步获取 gateway 配置
+    fetchGatewayConfig()
   }
-  
+
   init()
   
   return {
@@ -919,6 +1017,8 @@ export const useChatStore = defineStore('chat', () => {
     // 计算属性
     isConnected,
     wsUrl,
+    displayGatewayUrl,
+    gatewayRequiresToken,
 
     // 方法
     connect,

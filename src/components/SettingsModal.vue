@@ -72,6 +72,10 @@ function closeModal(): void {
         <div v-if="chatStore.connectionError" class="error-message">
           {{ chatStore.connectionError }}
         </div>
+        <div class="gateway-url">
+          <span class="label">Gateway:</span>
+          <code>{{ chatStore.displayGatewayUrl }}</code>
+        </div>
       </div>
 
       <!-- Session Key -->
@@ -106,13 +110,17 @@ function closeModal(): void {
 
       <!-- Token -->
       <div class="field-group">
-        <label class="field-label">Token</label>
+        <label class="field-label">
+          Token
+          <span v-if="chatStore.gatewayRequiresToken" class="field-required">* 必填</span>
+          <span v-else class="field-optional">可选</span>
+        </label>
         <div class="token-field">
           <input
             v-model="localSettings.token"
             :type="showToken ? 'text' : 'password'"
             class="field-input"
-            placeholder="输入 Token"
+            :placeholder="chatStore.gatewayRequiresToken ? '输入 Gateway Token' : '无 Token 可留空'"
           />
           <button class="toggle-btn" @click="showToken = !showToken">
             <svg v-if="showToken" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -125,6 +133,11 @@ function closeModal(): void {
             </svg>
           </button>
         </div>
+        <p class="field-help">
+          {{ chatStore.gatewayRequiresToken
+            ? '在 ~/.openclaw/openclaw.json 中查看 gateway.auth.token'
+            : 'Gateway 未配置 Token 验证，可直接连接' }}
+        </p>
       </div>
     </div>
 
@@ -260,6 +273,26 @@ function closeModal(): void {
   border-radius: var(--radius);
 }
 
+.gateway-url {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+}
+
+.gateway-url .label {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.gateway-url code {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
 .field-group {
   display: flex;
   flex-direction: column;
@@ -287,6 +320,28 @@ function closeModal(): void {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.field-required {
+  color: var(--error);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.field-optional {
+  color: var(--success);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.field-help {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  font-style: italic;
 }
 
 .field-input {

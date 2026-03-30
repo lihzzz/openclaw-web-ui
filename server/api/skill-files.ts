@@ -6,35 +6,43 @@ import {
   deleteSkill,
   listSkillFiles,
   createSkillFile,
-  deleteSkillFile,
-  getOpenclawSkillByLocation,
-  listOpenclawSkills
+  deleteSkillFile
 } from '../lib/openclaw-skills.js';
-import { OPENCLAW_SKILLS_DIR } from '../lib/openclaw-paths.js';
 import { callOpenclawGateway } from '../lib/openclaw-cli.js';
 import { clearConfigCache } from '../lib/config-cache.js';
-import path from 'path';
 
 const router = Router();
 
 const GATEWAY_CALL_TIMEOUT_MS = 15000;
+
+function getString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function sendSkillFileError(res: any, err: any) {
+  const message = err instanceof Error ? err.message : String(err || 'Unknown error');
+  if (message.includes('outside allowed skill directories') || message.includes('Invalid')) {
+    return res.status(400).json({ error: message });
+  }
+  return res.status(500).json({ error: message });
+}
 
 /**
  * GET /api/skill-files
  * Get skill files list
  */
 router.get('/', (req, res) => {
-  const { skillDir } = req.query;
+  const skillDir = getString(req.query.skillDir);
 
   if (!skillDir) {
     return res.status(400).json({ error: 'Missing skillDir parameter' });
   }
 
   try {
-    const files = listSkillFiles(String(skillDir));
+    const files = listSkillFiles(skillDir);
     res.json({ files });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 
@@ -43,20 +51,20 @@ router.get('/', (req, res) => {
  * Read a specific file
  */
 router.get('/read', (req, res) => {
-  const { filePath } = req.query;
+  const filePath = getString(req.query.filePath);
 
   if (!filePath) {
     return res.status(400).json({ error: 'Missing filePath parameter' });
   }
 
   try {
-    const result = readSkillFile(String(filePath));
+    const result = readSkillFile(filePath);
     if (!result.exists) {
       return res.status(404).json({ error: 'File not found' });
     }
     res.json({ content: result.content, exists: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 
@@ -65,14 +73,15 @@ router.get('/read', (req, res) => {
  * Write to a file (create or update)
  */
 router.post('/write', async (req, res) => {
-  const { filePath, content } = req.body;
+  const filePath = getString(req.body?.filePath);
+  const content = typeof req.body?.content === 'string' ? req.body.content : '';
 
   if (!filePath) {
     return res.status(400).json({ error: 'Missing filePath parameter' });
   }
 
   try {
-    const result = writeSkillFile(String(filePath), String(content || ''));
+    const result = writeSkillFile(filePath, content);
     if (!result.success) {
       return res.status(500).json({ error: result.error });
     }
@@ -87,7 +96,7 @@ router.post('/write', async (req, res) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 
@@ -96,7 +105,10 @@ router.post('/write', async (req, res) => {
  * Create a new skill
  */
 router.post('/create-skill', async (req, res) => {
-  const { skillId, name, description, emoji } = req.body;
+  const skillId = getString(req.body?.skillId);
+  const name = getString(req.body?.name);
+  const description = getString(req.body?.description);
+  const emoji = getString(req.body?.emoji);
 
   if (!skillId) {
     return res.status(400).json({ error: 'Missing skillId parameter' });
@@ -104,10 +116,10 @@ router.post('/create-skill', async (req, res) => {
 
   try {
     const result = createSkill(
-      String(skillId),
-      String(name || skillId),
-      String(description || ''),
-      String(emoji || '🔧')
+      skillId,
+      name || skillId,
+      description || '',
+      emoji || '🔧'
     );
 
     if (!result.success) {
@@ -124,7 +136,7 @@ router.post('/create-skill', async (req, res) => {
 
     res.json({ success: true, skill: result.skill });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 
@@ -133,14 +145,15 @@ router.post('/create-skill', async (req, res) => {
  * Delete a skill
  */
 router.delete('/delete-skill', async (req, res) => {
-  const { source, skillId } = req.body;
+  const source = getString(req.body?.source);
+  const skillId = getString(req.body?.skillId);
 
   if (!source || !skillId) {
     return res.status(400).json({ error: 'Missing source or skillId parameter' });
   }
 
   try {
-    const result = deleteSkill(String(source), String(skillId));
+    const result = deleteSkill(source, skillId);
 
     if (!result.success) {
       return res.status(400).json({ error: result.error });
@@ -156,7 +169,7 @@ router.delete('/delete-skill', async (req, res) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 
@@ -165,14 +178,16 @@ router.delete('/delete-skill', async (req, res) => {
  * Create a new file in a skill directory
  */
 router.post('/create-file', async (req, res) => {
-  const { skillDir, fileName, content } = req.body;
+  const skillDir = getString(req.body?.skillDir);
+  const fileName = getString(req.body?.fileName);
+  const content = typeof req.body?.content === 'string' ? req.body.content : '';
 
   if (!skillDir || !fileName) {
     return res.status(400).json({ error: 'Missing skillDir or fileName parameter' });
   }
 
   try {
-    const result = createSkillFile(String(skillDir), String(fileName), String(content || ''));
+    const result = createSkillFile(skillDir, fileName, content);
 
     if (!result.success) {
       return res.status(400).json({ error: result.error });
@@ -188,7 +203,7 @@ router.post('/create-file', async (req, res) => {
 
     res.json({ success: true, path: result.path });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 
@@ -197,14 +212,14 @@ router.post('/create-file', async (req, res) => {
  * Delete a file
  */
 router.delete('/delete-file', async (req, res) => {
-  const { filePath } = req.body;
+  const filePath = getString(req.body?.filePath);
 
   if (!filePath) {
     return res.status(400).json({ error: 'Missing filePath parameter' });
   }
 
   try {
-    const result = deleteSkillFile(String(filePath));
+    const result = deleteSkillFile(filePath);
 
     if (!result.success) {
       return res.status(400).json({ error: result.error });
@@ -220,7 +235,7 @@ router.delete('/delete-file', async (req, res) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendSkillFileError(res, err);
   }
 });
 

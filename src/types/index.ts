@@ -8,6 +8,7 @@ export interface Message {
   timestamp: number
   runId?: string
   toolCalls?: ToolCall[]
+  thinking?: string  // 思考内容
 }
 
 /**
@@ -130,8 +131,10 @@ export interface ModelProvider {
  */
 export interface GatewayConfig {
   port: number
-  token?: string
   host?: string
+  hasToken?: boolean
+  token?: string
+  externalHost?: string
 }
 
 /**
@@ -395,3 +398,5 @@ export interface SkillContentResponse {
   content: string
 }
 
+// ===== Scheduler 相关类型 =====
+export * from './scheduler'

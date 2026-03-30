@@ -9,9 +9,6 @@ import MiniSparkline from './MiniSparkline.vue'
 const props = defineProps<{
   agent: Agent
   agentState?: string
-  gatewayPort: number
-  gatewayToken?: string
-  gatewayHost?: string
   testResult?: { ok: boolean; error?: string; text?: string; elapsed: number } | null
   platformTestResults?: Record<string, { ok: boolean; error?: string; elapsed: number } | null>
   sessionTestResult?: { ok: boolean; error?: string; reply?: string; elapsed: number } | null
